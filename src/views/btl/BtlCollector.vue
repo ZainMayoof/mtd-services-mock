@@ -164,19 +164,18 @@
         <section ref="channelsSection" id="channels-section" class="channels-section">
           <div class="section-header">
             <h3 class="section-title">Channel Overview (mock)</h3>
-            <div v-if="selectedChannel" class="selected-channel">
-              Selected channel: CH {{ selectedChannel.index }} (eLink {{ selectedChannel.elink }})
+            <div v-if="selectedChannelInfo" class="selected-channel">
+              Selected channel: CH {{ selectedChannelInfo.id }} (eLink {{ selectedChannelInfo.elink }})
             </div>
           </div>
           <div class="channel-grid">
             <div
               v-for="channel in channelTiles"
-              :key="channel.index"
-              class="channel-tile"
-              :class="{ 'channel-selected': selectedChannel && selectedChannel.index === channel.index }"
-              @click="selectChannel(channel)"
+              :key="channel.id"
+              :class="['channel-tile', { 'channel-tile--selected': selectedChannel === channel.id }]"
+              @click="focusChannelFromGrid(channel.id, channel.elink)"
             >
-              <p class="channel-id">CH {{ channel.index }}</p>
+              <p class="channel-id">CH {{ channel.id }}</p>
               <p class="channel-meta">eLink {{ channel.elink }}</p>
               <p class="channel-meta">Hit rate: {{ channel.hitRate }} kHz</p>
               <span class="status-pill" :class="`status-${channel.status}`">{{ channel.statusLabel }}</span>
@@ -217,28 +216,44 @@
       <!-- Reconstruction Tab -->
       <div v-else class="reconstruction-panel">
         <div class="recon-header">
-          <div>
+          <div class="recon-context">
             <p class="recon-meta">
               Serenity: <span class="recon-value">{{ serenity }}</span> - CC:
               <span class="recon-value">{{ cc }}</span>
             </p>
             <p class="recon-meta">
-              {{ selectedChannel ? `Focused channel: CH ${selectedChannel.index} (eLink ${selectedChannel.elink})` : 'Showing channels 1-8' }}
+              <template v-if="focusedChannelDisplay">
+                Focused channel: CH {{ focusedChannelDisplay.id }} (eLink {{ focusedChannelDisplay.elink }})
+              </template>
+              <template v-else>
+                Showing channels 1-8
+              </template>
             </p>
           </div>
-          <button class="btn-action btn-solid" @click="toggleReconstruction">
-            {{ showReconstructionGraphs ? 'Collapse graphs' : 'Expand graphs' }}
-          </button>
+          <div class="recon-controls">
+            <label class="show-only-toggle">
+              <input type="checkbox" v-model="showOnlySelected" :disabled="!hasReconForSelection" />
+              <span>Show only focused channel</span>
+            </label>
+            <button class="btn-action btn-solid" @click="toggleReconstruction">
+              {{ showReconstructionGraphs ? 'Collapse graphs' : 'Expand graphs' }}
+            </button>
+          </div>
         </div>
 
         <div v-if="showReconstructionGraphs" class="reconstruction-cards">
-          <div v-for="channel in reconChannels" :key="channel.id" class="recon-card">
+          <div
+            v-for="channel in visibleReconChannels"
+            :key="channel.id"
+            class="recon-card"
+            :id="`recon-card-${channel.id}`"
+          >
             <div class="recon-card-header">
               <span>channel {{ channel.id }} - eLink {{ channel.elink }}</span>
-              <span>mean={{ channel.mean.toFixed(1) }} ps, std={{ channel.std.toFixed(1) }} ps</span>
+              <span>mean={{ channel.mean.toFixed(1) }} ps, std={{ channel.sigma.toFixed(1) }} ps</span>
             </div>
             <div class="recon-card-body">
-              <ReconstructionChart :channel-id="channel.id" :mean="channel.mean" :std="channel.std" />
+              <ReconstructionChart :mean="channel.mean" :sigma="channel.sigma" />
             </div>
           </div>
         </div>
@@ -346,14 +361,14 @@ const liveCards = computed(() => [
 
 // Reconstruction channels config
 const reconChannels = [
-  { id: 1, elink: 0, mean: 125.5, std: 12.3 },
-  { id: 2, elink: 0, mean: 128.2, std: 11.8 },
-  { id: 3, elink: 1, mean: 122.7, std: 13.1 },
-  { id: 4, elink: 1, mean: 130.1, std: 12.5 },
-  { id: 5, elink: 2, mean: 127.3, std: 11.9 },
-  { id: 6, elink: 2, mean: 124.8, std: 12.7 },
-  { id: 7, elink: 3, mean: 129.4, std: 12.1 },
-  { id: 8, elink: 3, mean: 126.6, std: 12.4 }
+  { id: 1, elink: 0, mean: 125.5, sigma: 12.3 },
+  { id: 2, elink: 0, mean: 128.2, sigma: 11.8 },
+  { id: 3, elink: 1, mean: 122.7, sigma: 13.1 },
+  { id: 4, elink: 1, mean: 130.1, sigma: 12.5 },
+  { id: 5, elink: 2, mean: 127.3, sigma: 11.9 },
+  { id: 6, elink: 2, mean: 124.8, sigma: 12.7 },
+  { id: 7, elink: 3, mean: 129.4, sigma: 12.1 },
+  { id: 8, elink: 3, mean: 126.6, sigma: 12.4 }
 ]
 
 // Alerts data
@@ -369,21 +384,22 @@ const alerts = reactive([
   { severity: 'warning', severityLabel: 'WARNING', message: 'Small VDD dip detected 3h ago.', time: '3h ago' }
 ])
 
-// Channel overview
+// Channel overview + reconstruction focus
 const channelTiles = ref(generateChannels())
 const selectedChannel = ref(null)
+const showOnlySelected = ref(false)
 
 function generateChannels() {
   const tiles = []
-  for (let i = 0; i < 48; i++) {
-    const elink = Math.floor(i / 12)
+  for (let i = 1; i <= 48; i++) {
+    const elink = Math.floor((i - 1) / 12)
     const roll = Math.random()
     let status = 'active'
     if (roll > 0.85) status = 'warning'
     else if (roll > 0.65) status = 'idle'
 
     tiles.push({
-      index: i,
+      id: i,
       elink,
       hitRate: (Math.random() * 60 + 40).toFixed(1),
       status,
@@ -393,9 +409,60 @@ function generateChannels() {
   return tiles
 }
 
-const selectChannel = channel => {
-  selectedChannel.value = channel
+const selectedChannelInfo = computed(() => {
+  if (selectedChannel.value === null) return null
+  return channelTiles.value.find(tile => tile.id === selectedChannel.value) || null
+})
+
+const selectedChannelFallbackElink = ref(null)
+
+const focusedChannelDisplay = computed(() => {
+  if (selectedChannel.value === null) return null
+  return {
+    id: selectedChannel.value,
+    elink: selectedChannelInfo.value?.elink ?? selectedChannelFallbackElink.value ?? '-'
+  }
+})
+
+const hasReconForSelection = computed(() => {
+  if (selectedChannel.value === null) return false
+  return reconChannels.some(channel => channel.id === selectedChannel.value)
+})
+
+const visibleReconChannels = computed(() => {
+  if (showOnlySelected.value && selectedChannel.value !== null && hasReconForSelection.value) {
+    return reconChannels.filter(channel => channel.id === selectedChannel.value)
+  }
+  return reconChannels
+})
+
+const focusChannelFromGrid = (channelId, elink) => {
+  selectedChannel.value = channelId
+  selectedChannelFallbackElink.value = elink
+  activeTab.value = 'reconstruction'
+  if (!showReconstructionGraphs.value) {
+    showReconstructionGraphs.value = true
+  }
+  nextTick(() => {
+    const target = document.getElementById(`recon-card-${channelId}`)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  })
 }
+
+watch(selectedChannel, value => {
+  if (value === null) {
+    showOnlySelected.value = false
+    selectedChannelFallbackElink.value = null
+  }
+})
+
+watch(hasReconForSelection, canFilter => {
+  if (!canFilter) {
+    showOnlySelected.value = false
+  }
+})
 
 // Historical chart
 const historicalStats = reactive({
@@ -520,6 +587,7 @@ const reset = () => {
   showFilter.value = true
   activeTab.value = 'overview'
   selectedChannel.value = null
+  showOnlySelected.value = false
   showReconstructionGraphs.value = true
   destroyHistoricalChart()
   detachScrollSpy()
@@ -531,6 +599,7 @@ const backToFilter = () => {
   hasDisplayed.value = false
   activeTab.value = 'overview'
   selectedChannel.value = null
+  showOnlySelected.value = false
   showReconstructionGraphs.value = true
   destroyHistoricalChart()
   detachScrollSpy()
@@ -1055,8 +1124,9 @@ onUnmounted(() => {
   box-shadow: inset 0 0 0 1px #d1d5db;
 }
 
-.channel-selected {
+.channel-tile--selected {
   border-color: #0a9ebb;
+  background: #ecfeff;
   box-shadow: 0 0 0 1px #0a9ebb inset;
 }
 
@@ -1197,12 +1267,19 @@ onUnmounted(() => {
 .recon-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   background: #fff;
   padding: 16px 20px;
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
   margin-bottom: 20px;
+  gap: 16px;
+}
+
+.recon-context {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .recon-meta {
@@ -1214,6 +1291,35 @@ onUnmounted(() => {
 .recon-value {
   font-weight: 600;
   color: #111827;
+}
+
+.recon-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.show-only-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.show-only-toggle input {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.show-only-toggle input:disabled {
+  cursor: not-allowed;
+}
+
+.show-only-toggle span {
+  font-weight: 500;
 }
 
 .reconstruction-cards {

@@ -1,224 +1,158 @@
 <template>
-  <div class="chart-container">
-    <div class="chart-legend">
-      <span>Frequency</span>
-      <span>mean={{ props.mean.toFixed(1) }} ps, std={{ props.std.toFixed(1) }} ps</span>
-    </div>
-    <canvas :ref="chartRef"></canvas>
+  <div class="recon-chart">
+    <canvas ref="canvasRef"></canvas>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { Chart, registerables } from 'chart.js'
+<script setup lang="ts">
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import {
+  Chart,
+  BarController,
+  BarElement,
+  LineController,
+  LineElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  Legend
+} from 'chart.js'
 
-Chart.register(...registerables)
+Chart.register(
+  BarController,
+  BarElement,
+  LineController,
+  LineElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  Legend
+)
 
-const props = defineProps({
-  channelId: {
-    type: Number,
-    required: true
-  },
-  mean: {
-    type: Number,
-    required: true
-  },
-  std: {
-    type: Number,
-    required: true
+const props = defineProps<{
+  mean: number
+  sigma: number
+}>()
+
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+let chart: Chart | null = null
+
+const buildData = (mean: number, sigma: number) => {
+  const bins = 24
+  const minX = mean - 4 * sigma
+  const maxX = mean + 4 * sigma
+  const step = (maxX - minX) / bins
+  const labels: number[] = []
+  const histogram: number[] = []
+
+  for (let i = 0; i < bins; i++) {
+    const center = minX + (i + 0.5) * step
+    labels.push(Math.round(center))
+    const exponent = -0.5 * Math.pow((center - mean) / sigma, 2)
+    const base = Math.exp(exponent)
+    histogram.push(Math.round(base * 400 + Math.random() * 25))
   }
-})
 
-const chartRef = ref(null)
-let chartInstance = null
-
-// Generate histogram data
-const generateHistogramData = () => {
-  const bins = 20
-  const minX = props.mean - 4 * props.std
-  const maxX = props.mean + 4 * props.std
-  const binWidth = (maxX - minX) / bins
-  const histogram = new Array(bins).fill(0)
-  
-  // Generate random data points following Gaussian distribution
-  const numPoints = 1000
-  for (let i = 0; i < numPoints; i++) {
-    // Box-Muller transform for Gaussian distribution
-    const u1 = Math.random()
-    const u2 = Math.random()
-    const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
-    const value = props.mean + z0 * props.std
-    
-    if (value >= minX && value <= maxX) {
-      const binIndex = Math.floor((value - minX) / binWidth)
-      if (binIndex >= 0 && binIndex < bins) {
-        histogram[binIndex]++
-      }
-    }
-  }
-  
-  return { histogram, minX, maxX, binWidth }
-}
-
-// Generate Gaussian curve data
-const generateGaussianData = (minX, maxX) => {
-  const points = 100
-  const step = (maxX - minX) / points
-  const data = []
-  
-  for (let i = 0; i <= points; i++) {
-    const x = minX + i * step
-    const exponent = -0.5 * Math.pow((x - props.mean) / props.std, 2)
-    const y = Math.exp(exponent) * 100 // Scale for visibility
-    data.push({ x, y })
-  }
-  
-  return data
-}
-
-const createChart = () => {
-  if (!chartRef.value) return
-  
-  const { histogram, minX, maxX, binWidth } = generateHistogramData()
-  const gaussianData = generateGaussianData(minX, maxX)
-  
-  // Create bin labels (center of each bin)
-  const labels = []
-  for (let i = 0; i < histogram.length; i++) {
-    labels.push(Math.round(minX + (i + 0.5) * binWidth))
-  }
-  
-  // Scale Gaussian to match histogram max
-  const maxHist = Math.max(...histogram)
-  const maxGauss = Math.max(...gaussianData.map(d => d.y))
-  const scaleFactor = maxHist / maxGauss
-  const scaledGaussian = gaussianData.map(d => d.y * scaleFactor)
-  
-  // Create x values for Gaussian (matching bin centers)
-  const gaussianXValues = []
-  for (let i = 0; i < histogram.length; i++) {
-    const x = minX + (i + 0.5) * binWidth
-    gaussianXValues.push(x)
-  }
-  
-  // Interpolate Gaussian values at bin centers
-  const gaussianAtBins = gaussianXValues.map(x => {
-    // Find closest point in gaussianData
-    let closest = gaussianData[0]
-    let minDist = Math.abs(x - gaussianData[0].x)
-    for (const point of gaussianData) {
-      const dist = Math.abs(x - point.x)
-      if (dist < minDist) {
-        minDist = dist
-        closest = point
-      }
-    }
-    return closest.y * scaleFactor
+  const gaussian = labels.map(label => {
+    const exponent = -0.5 * Math.pow((label - mean) / sigma, 2)
+    return Math.exp(exponent) * 400
   })
-  
-  // Destroy existing chart if any
-  if (chartInstance) {
-    chartInstance.destroy()
-  }
-  
-  chartInstance = new Chart(chartRef.value, {
+
+  return { labels, histogram, gaussian }
+}
+
+const renderChart = () => {
+  if (!canvasRef.value) return
+  const { labels, histogram, gaussian } = buildData(props.mean, props.sigma)
+
+  chart = new Chart(canvasRef.value, {
     type: 'bar',
     data: {
-      labels: labels,
+      labels,
       datasets: [
         {
+          type: 'bar',
           label: 'Frequency',
           data: histogram,
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1,
-          order: 2
+          borderRadius: 2,
+          backgroundColor: 'rgba(15, 146, 191, 0.35)',
+          borderColor: '#0f92bf'
         },
         {
-          label: 'Gaussian Fit',
-          data: gaussianAtBins,
           type: 'line',
-          borderColor: 'rgba(255, 99, 132, 1)',
-          borderWidth: 2,
-          borderDash: [5, 5],
-          fill: false,
+          label: 'Gaussian fit',
+          data: gaussian,
+          borderColor: '#ef4444',
+          borderWidth: 1.5,
           pointRadius: 0,
-          order: 1,
-          tension: 0.4
+          borderDash: [5, 4],
+          tension: 0.35
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: false
-        },
-        tooltip: {
-          enabled: true
-        }
-      },
       scales: {
         x: {
-          title: {
-            display: true,
-            text: 'Time Resolution [ps]'
-          },
-          ticks: {
-            maxTicksLimit: 10
-          }
+          title: { display: true, text: 'Time Resolution [ps]' }
         },
         y: {
-          title: {
-            display: true,
-            text: 'Count'
-          },
+          title: { display: true, text: 'Count' },
           beginAtZero: true
+        }
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false
         }
       }
     }
   })
 }
 
-onMounted(() => {
-  createChart()
-})
-
-onUnmounted(() => {
-  if (chartInstance) {
-    chartInstance.destroy()
+const destroyChart = () => {
+  if (chart) {
+    chart.destroy()
+    chart = null
   }
+}
+
+onMounted(() => {
+  renderChart()
 })
 
-watch([() => props.mean, () => props.std], () => {
-  createChart()
+onBeforeUnmount(() => {
+  destroyChart()
 })
+
+watch(
+  () => [props.mean, props.sigma],
+  () => {
+    destroyChart()
+    renderChart()
+  }
+)
 </script>
 
 <style scoped>
-.chart-container {
+.recon-chart {
   width: 100%;
-  height: 300px;
-  position: relative;
+  height: 260px;
 }
 
-.chart-legend {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  font-size: 12px;
-  color: #4A4A4A;
-  margin-bottom: 8px;
-}
-
-.chart-legend span:first-child {
-  font-weight: 600;
-}
-
-.chart-legend span:last-child {
-  color: #7A7A7A;
+canvas {
+  width: 100%;
+  height: 100%;
 }
 </style>
-
