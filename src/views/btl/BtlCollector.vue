@@ -1,18 +1,15 @@
 <template>
   <div class="collector-page">
-    <!-- Filter Card (hidden when displayed) -->
-    <div v-if="!hasDisplayed" class="collector-card">
-      <!-- Header bar -->
+    <!-- Filter Card -->
+    <div v-if="showFilter" ref="filterCardRef" class="collector-card">
       <div class="card-header">
         <div class="header-title">
           <span>MTD BTL Collector</span>
-          <span class="info-icon">ⓘ</span>
+          <span class="info-icon">i</span>
         </div>
       </div>
 
-      <!-- Card body -->
       <div class="card-body">
-        <!-- Serenity board field -->
         <div class="form-group">
           <label class="field-label">Serenity board</label>
           <div class="dropdown-wrapper">
@@ -22,11 +19,10 @@
               <option value="Z1.1" disabled>Z1.1</option>
               <option value="Z1.2" disabled>Z1.2</option>
             </select>
-            <span class="dropdown-arrow">▼</span>
+            <span class="dropdown-arrow">v</span>
           </div>
         </div>
 
-        <!-- CC field -->
         <div class="form-group">
           <label class="field-label">CC</label>
           <div class="dropdown-wrapper">
@@ -35,11 +31,10 @@
               <option value="CC2" v-if="!ccDisabled">CC2</option>
               <option value="CC3" v-if="!ccDisabled">CC3</option>
             </select>
-            <span class="dropdown-arrow">▼</span>
+            <span class="dropdown-arrow">v</span>
           </div>
         </div>
 
-        <!-- Buttons -->
         <div class="button-group">
           <button class="btn btn-reset" @click="reset">Reset</button>
           <button class="btn btn-display" @click="display">Display</button>
@@ -47,207 +42,259 @@
       </div>
     </div>
 
-    <!-- Main Content Area (shown after Display - separate page) -->
-    <div v-if="hasDisplayed" class="main-content">
-      <!-- Back Button -->
-      <div class="back-button-wrapper">
-        <button class="btn-back" @click="reset">← Back to Filter</button>
-      </div>
-      <!-- Summary Banner -->
-      <div class="summary-card">
-        <div class="summary-left">
-          <div class="meta-row">
-            <span class="meta-label">Serenity Board</span>
-            <span class="meta-value">{{ serenity }}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">CC</span>
-            <span class="meta-value">{{ cc }}</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">eLinks active</span>
-            <span class="meta-value">4 / 4</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Channels</span>
-            <span class="meta-value">48 channels</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-label">Firmware version</span>
-            <span class="meta-value">v1.3.2-mock</span>
-          </div>
-        </div>
+    <!-- Results Tabs -->
+    <div v-if="hasDisplayed" class="results-container">
+      <button class="back-link" @click="backToFilter">&lt;&lt; Back to Filter</button>
 
-        <div class="summary-right">
-          <div class="health-pill">
-            Healthy
-          </div>
-          <div class="metrics-row">
-            <div class="metric-item">
-              <span class="metric-label">Last update</span>
-              <span class="metric-value">{{ lastUpdate }}</span>
-            </div>
-            <div class="metric-item">
-              <span class="metric-label">CRC errors</span>
-              <span class="metric-value metric-green">0</span>
-            </div>
-            <div class="metric-item">
-              <span class="metric-label">Frame lock</span>
-              <span class="metric-value metric-green"><span class="dot-green">●</span> Locked</span>
-            </div>
-          </div>
-        </div>
+      <div class="collector-tabs">
+        <button
+          class="tab-item"
+          :class="{ active: activeTab === 'overview' }"
+          @click="setActiveTab('overview')"
+        >
+          Overview
+        </button>
+        <button
+          class="tab-item"
+          :class="{ active: activeTab === 'reconstruction' }"
+          @click="setActiveTab('reconstruction')"
+        >
+          Reconstruction
+        </button>
       </div>
 
-      <!-- Live Monitoring Section -->
-      <div class="live-section">
-        <h3 class="section-title">Live Monitoring (mock data)</h3>
-
-        <div class="monitoring-cards">
-          <!-- Temperatures Card -->
-          <div class="monitor-card">
-            <div class="card-header-row">
-              <h4 class="card-title">Temperatures</h4>
-              <div class="live-indicator">
-                <span class="live-dot"></span>
-                <span class="live-text">LIVE</span>
-              </div>
-            </div>
-            <div class="card-content">
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> TOFHIR temperature</span>
-                <span class="data-value">{{ temps.tofhir }} °C</span>
-              </div>
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> LPGBT temperature</span>
-                <span class="data-value">{{ temps.lpgbt }} °C</span>
-              </div>
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> Board temperature</span>
-                <span class="data-value">{{ temps.board }} °C</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Voltages Card -->
-          <div class="monitor-card">
-            <div class="card-header-row">
-              <h4 class="card-title">Voltages</h4>
-              <div class="live-indicator">
-                <span class="live-dot"></span>
-                <span class="live-text">LIVE</span>
-              </div>
-            </div>
-            <div class="card-content">
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> VDD</span>
-                <span class="data-value">{{ voltages.vdd }} V</span>
-              </div>
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> VDDL</span>
-                <span class="data-value">{{ voltages.vddl }} V</span>
-              </div>
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> Vbias</span>
-                <span class="data-value">{{ voltages.vbias }} V</span>
-              </div>
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> 1V8</span>
-                <span class="data-value">{{ voltages.v1v8 }} V</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Currents Card -->
-          <div class="monitor-card">
-            <div class="card-header-row">
-              <h4 class="card-title">Currents</h4>
-              <div class="live-indicator">
-                <span class="live-dot"></span>
-                <span class="live-text">LIVE</span>
-              </div>
-            </div>
-            <div class="card-content">
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> AVDD current</span>
-                <span class="data-value">{{ currents.avdd }} mA</span>
-              </div>
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> DVDD current</span>
-                <span class="data-value">{{ currents.dvdd }} mA</span>
-              </div>
-              <div class="data-row">
-                <span class="data-label"><span class="dot green">●</span> Total board current</span>
-                <span class="data-value">{{ currents.total }} mA</span>
-              </div>
-            </div>
-          </div>
+      <!-- Overview Tab -->
+      <div v-if="activeTab === 'overview'" class="tab-panel">
+        <div class="mini-nav">
+          <button
+            v-for="item in miniNavItems"
+            :key="item.key"
+            class="mini-nav-item"
+            :class="{ active: activeMiniNav === item.key }"
+            @click="scrollToSection(item.key)"
+          >
+            {{ item.label }}
+          </button>
         </div>
-      </div>
 
-      <!-- TOFHIR Reconstruction Section -->
-      <div v-if="!graphsCollapsed" class="reconstruction-section">
-        <h3 class="reconstruction-title">TOFHIR Reconstruction (mock)</h3>
-        
-        <div class="reconstruction-cards">
-          <div v-for="channel in reconChannels" :key="channel.id" class="recon-card">
-            <div class="recon-card-header">
-              channel {{ channel.id }} – eLink {{ channel.elink }}
+        <section ref="summarySection" id="overview-section" class="summary-section">
+          <div class="summary-card">
+            <div class="summary-left">
+              <div class="meta-row" v-for="meta in summaryMeta" :key="meta.label">
+                <span class="meta-label">{{ meta.label }}</span>
+                <span class="meta-value">{{ meta.value }}</span>
+              </div>
             </div>
-            <div class="recon-card-body">
-              <ReconstructionChart 
-                :channel-id="channel.id" 
-                :mean="channelStats[channel.id - 1].mean"
-                :std="channelStats[channel.id - 1].std"
-              />
+            <div class="summary-right">
+              <div class="health-pill">Healthy</div>
+              <div class="metrics-row">
+                <div class="metric-item">
+                  <span class="metric-label">Last update</span>
+                  <span class="metric-value">{{ formattedLastUpdate }}</span>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">CRC errors</span>
+                  <span class="metric-value metric-green">0</span>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Frame lock</span>
+                  <span class="metric-value metric-green">
+                    <span class="dot-green"></span> Locked
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      <!-- Alerts Section -->
-      <div class="alerts-section">
-        <div class="alerts-card">
-          <h3 class="alerts-title">Alerts & Notifications</h3>
-          <div class="alerts-list">
-            <div v-for="(alert, index) in alerts" :key="index" :class="['alert-item', `alert-${alert.severity}`]">
-              <span :class="['alert-icon', `alert-icon-${alert.severity}`]">●</span>
-              <div class="alert-content">
-                <div class="alert-header">
+        <section ref="liveSection" id="live-section" class="live-section">
+          <h3 class="section-title">Live Monitoring (mock data)</h3>
+          <div class="monitoring-cards">
+            <div class="monitor-card" v-for="card in liveCards" :key="card.title">
+              <div class="card-header-row">
+                <h4 class="card-title">{{ card.title }}</h4>
+                <div class="live-indicator">
+                  <span class="live-dot"></span>
+                  <span class="live-text">LIVE - {{ lastUpdatedAgo }}</span>
+                </div>
+              </div>
+              <div class="card-content">
+                <div class="data-row" v-for="row in card.rows" :key="row.label">
+                  <span class="data-label">
+                    <span class="dot green"></span>{{ row.label }}
+                  </span>
+                  <span class="data-value">{{ row.value }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <section ref="historicalSection" id="historical-section" class="historical-section">
+          <div class="historical-card">
+            <div class="section-header">
+              <h3 class="section-title">Historical Summary (mock)</h3>
+            </div>
+            <div class="stat-blocks">
+              <div class="stat-block">
+                <p class="stat-label">Max temperature (24h)</p>
+                <p class="stat-value">{{ historicalStats.maxTemp }}&deg;C</p>
+              </div>
+              <div class="stat-block">
+                <p class="stat-label">Min VDD (24h)</p>
+                <p class="stat-value">{{ historicalStats.minVdd }} V</p>
+              </div>
+              <div class="stat-block">
+                <p class="stat-label">Max current (24h)</p>
+                <p class="stat-value">{{ historicalStats.maxCurrent }} mA</p>
+              </div>
+              <div class="stat-block">
+                <p class="stat-label">Warnings (24h)</p>
+                <p class="stat-value">{{ historicalStats.warnings }}</p>
+              </div>
+            </div>
+            <div class="historical-chart">
+              <canvas ref="historicalChartRef"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <section ref="channelsSection" id="channels-section" class="channels-section">
+          <div class="section-header">
+            <h3 class="section-title">Channel Overview (mock)</h3>
+            <div v-if="selectedChannel" class="selected-channel">
+              Selected channel: CH {{ selectedChannel.index }} (eLink {{ selectedChannel.elink }})
+            </div>
+          </div>
+          <div class="channel-grid">
+            <div
+              v-for="channel in channelTiles"
+              :key="channel.index"
+              class="channel-tile"
+              :class="{ 'channel-selected': selectedChannel && selectedChannel.index === channel.index }"
+              @click="selectChannel(channel)"
+            >
+              <p class="channel-id">CH {{ channel.index }}</p>
+              <p class="channel-meta">eLink {{ channel.elink }}</p>
+              <p class="channel-meta">Hit rate: {{ channel.hitRate }} kHz</p>
+              <span class="status-pill" :class="`status-${channel.status}`">{{ channel.statusLabel }}</span>
+            </div>
+          </div>
+        </section>
+
+        <section ref="alertsSection" id="alerts-section" class="alerts-section">
+          <div class="alerts-card">
+            <h3 class="section-title">Alerts & Notifications</h3>
+            <div class="alerts-list">
+              <div
+                v-for="(alert, index) in alerts"
+                :key="index"
+                class="alert-row"
+                :class="`alert-${alert.severity}`"
+              >
+                <div class="alert-meta">
+                  <span class="alert-dot" :class="`alert-dot-${alert.severity}`"></span>
                   <span class="alert-severity">{{ alert.severityLabel }}</span>
-                  <span class="alert-time">{{ alert.time }}</span>
                 </div>
                 <div class="alert-message">{{ alert.message }}</div>
+                <div class="alert-time">{{ alert.time }}</div>
               </div>
             </div>
           </div>
+        </section>
+
+        <div class="actions-bar">
+          <button class="btn-action btn-outline" @click="exportSummary">Export Summary</button>
+          <button class="btn-action btn-outline" @click="downloadCSV">Download CSV</button>
+          <button class="btn-action btn-solid" @click="toggleReconstruction">
+            {{ showReconstructionGraphs ? 'Collapse Graphs' : 'Expand Graphs' }}
+          </button>
         </div>
       </div>
 
-      <!-- Actions Footer -->
-      <div class="actions-footer">
-        <button class="btn-action btn-export" @click="exportSummary">Export Summary</button>
-        <button class="btn-action btn-download" @click="downloadCSV">Download CSV</button>
-        <button class="btn-action btn-collapse" @click="toggleGraphs">
-          {{ graphsCollapsed ? 'Show Graphs' : 'Collapse Graphs' }}
-        </button>
+      <!-- Reconstruction Tab -->
+      <div v-else class="reconstruction-panel">
+        <div class="recon-header">
+          <div>
+            <p class="recon-meta">
+              Serenity: <span class="recon-value">{{ serenity }}</span> - CC:
+              <span class="recon-value">{{ cc }}</span>
+            </p>
+            <p class="recon-meta">
+              {{ selectedChannel ? `Focused channel: CH ${selectedChannel.index} (eLink ${selectedChannel.elink})` : 'Showing channels 1-8' }}
+            </p>
+          </div>
+          <button class="btn-action btn-solid" @click="toggleReconstruction">
+            {{ showReconstructionGraphs ? 'Collapse graphs' : 'Expand graphs' }}
+          </button>
+        </div>
+
+        <div v-if="showReconstructionGraphs" class="reconstruction-cards">
+          <div v-for="channel in reconChannels" :key="channel.id" class="recon-card">
+            <div class="recon-card-header">
+              <span>channel {{ channel.id }} - eLink {{ channel.elink }}</span>
+              <span>mean={{ channel.mean.toFixed(1) }} ps, std={{ channel.std.toFixed(1) }} ps</span>
+            </div>
+            <div class="recon-card-body">
+              <ReconstructionChart :channel-id="channel.id" :mean="channel.mean" :std="channel.std" />
+            </div>
+          </div>
+        </div>
+        <div v-else class="recon-empty">
+          Graphs are hidden. Use "Expand graphs" to show TOFHIR reconstruction data.
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { Chart, registerables } from 'chart.js'
 import ReconstructionChart from './ReconstructionChart.vue'
+
+Chart.register(...registerables)
+
+const filterCardRef = ref(null)
+const summarySection = ref(null)
+const liveSection = ref(null)
+const channelsSection = ref(null)
+const alertsSection = ref(null)
+const historicalSection = ref(null)
+const historicalChartRef = ref(null)
 
 // Filter state
 const serenity = ref('')
 const cc = ref('')
 const ccDisabled = ref(true)
 const hasDisplayed = ref(false)
+const showFilter = ref(true)
+const activeTab = ref('overview')
+const showReconstructionGraphs = ref(true)
 
 // Summary state
 const lastUpdate = ref(new Date().toISOString())
+const summaryMeta = computed(() => [
+  { label: 'Serenity Board', value: serenity.value },
+  { label: 'CC', value: cc.value },
+  { label: 'eLinks active', value: '4 / 4' },
+  { label: 'Channels', value: '48 channels' },
+  { label: 'Firmware version', value: 'v1.3.2-mock' }
+])
+
+const formattedLastUpdate = computed(() => {
+  const date = new Date(lastUpdate.value)
+  return date.toLocaleTimeString()
+})
+
+const lastUpdatedAgo = computed(() => {
+  const diff = (Date.now() - new Date(lastUpdate.value).getTime()) / 1000
+  if (diff < 60) return `${Math.max(1, Math.floor(diff))}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  return `${Math.floor(diff / 3600)}h ago`
+})
 
 // Live monitoring state
 const temps = reactive({
@@ -257,8 +304,8 @@ const temps = reactive({
 })
 
 const voltages = reactive({
-  vdd: 1.20,
-  vddl: 1.50,
+  vdd: 1.2,
+  vddl: 1.5,
   vbias: 45.0,
   v1v8: 1.79
 })
@@ -269,64 +316,193 @@ const currents = reactive({
   total: 640
 })
 
-// Reconstruction channels config
-const reconChannels = [
-  { id: 1, elink: 0 },
-  { id: 2, elink: 0 },
-  { id: 3, elink: 1 },
-  { id: 4, elink: 1 },
-  { id: 5, elink: 2 },
-  { id: 6, elink: 2 },
-  { id: 7, elink: 3 },
-  { id: 8, elink: 3 }
-]
-
-// Channel stats (mean and std for each channel)
-const channelStats = [
-  { mean: 125.5, std: 12.3 },
-  { mean: 128.2, std: 11.8 },
-  { mean: 122.7, std: 13.1 },
-  { mean: 130.1, std: 12.5 },
-  { mean: 127.3, std: 11.9 },
-  { mean: 124.8, std: 12.7 },
-  { mean: 129.4, std: 12.1 },
-  { mean: 126.6, std: 12.4 }
-]
-
-// Graphs collapsed state
-const graphsCollapsed = ref(false)
-
-// Alerts data
-const alerts = reactive([
+const liveCards = computed(() => [
   {
-    severity: 'info',
-    severityLabel: 'INFO',
-    message: 'All links stable.',
-    time: '5 min ago'
+    title: 'Temperatures',
+    rows: [
+      { label: 'TOFHIR temperature', value: `${temps.tofhir.toFixed(1)} degC` },
+      { label: 'LPGBT temperature', value: `${temps.lpgbt.toFixed(1)} degC` },
+      { label: 'Board temperature', value: `${temps.board.toFixed(1)} degC` }
+    ]
   },
   {
-    severity: 'warning',
-    severityLabel: 'WARNING',
-    message: 'Temperature approaching limit on TOFHIR0 (31.8 °C).',
-    time: '12 min ago'
+    title: 'Voltages',
+    rows: [
+      { label: 'VDD', value: `${voltages.vdd.toFixed(2)} V` },
+      { label: 'VDDL', value: `${voltages.vddl.toFixed(2)} V` },
+      { label: 'Vbias', value: `${voltages.vbias.toFixed(1)} V` },
+      { label: '1V8', value: `${voltages.v1v8.toFixed(2)} V` }
+    ]
   },
   {
-    severity: 'success',
-    severityLabel: 'OK',
-    message: 'CRC errors: 0 (last 10 min).',
-    time: '15 min ago'
-  },
-  {
-    severity: 'warning',
-    severityLabel: 'WARNING',
-    message: 'Small VDD dip detected 3h ago.',
-    time: '3h ago'
+    title: 'Currents',
+    rows: [
+      { label: 'AVDD current', value: `${currents.avdd} mA` },
+      { label: 'DVDD current', value: `${currents.dvdd} mA` },
+      { label: 'Total board current', value: `${currents.total} mA` }
+    ]
   }
 ])
 
-let intervalId = null
+// Reconstruction channels config
+const reconChannels = [
+  { id: 1, elink: 0, mean: 125.5, std: 12.3 },
+  { id: 2, elink: 0, mean: 128.2, std: 11.8 },
+  { id: 3, elink: 1, mean: 122.7, std: 13.1 },
+  { id: 4, elink: 1, mean: 130.1, std: 12.5 },
+  { id: 5, elink: 2, mean: 127.3, std: 11.9 },
+  { id: 6, elink: 2, mean: 124.8, std: 12.7 },
+  { id: 7, elink: 3, mean: 129.4, std: 12.1 },
+  { id: 8, elink: 3, mean: 126.6, std: 12.4 }
+]
 
-// Dropdown handlers
+// Alerts data
+const alerts = reactive([
+  { severity: 'info', severityLabel: 'INFO', message: 'All links stable.', time: '5 min ago' },
+  {
+    severity: 'warning',
+    severityLabel: 'WARNING',
+    message: 'Temperature approaching limit on TOFHIR0 (31.8 degC).',
+    time: '12 min ago'
+  },
+  { severity: 'success', severityLabel: 'OK', message: 'CRC errors: 0 (last 10 min).', time: '15 min ago' },
+  { severity: 'warning', severityLabel: 'WARNING', message: 'Small VDD dip detected 3h ago.', time: '3h ago' }
+])
+
+// Channel overview
+const channelTiles = ref(generateChannels())
+const selectedChannel = ref(null)
+
+function generateChannels() {
+  const tiles = []
+  for (let i = 0; i < 48; i++) {
+    const elink = Math.floor(i / 12)
+    const roll = Math.random()
+    let status = 'active'
+    if (roll > 0.85) status = 'warning'
+    else if (roll > 0.65) status = 'idle'
+
+    tiles.push({
+      index: i,
+      elink,
+      hitRate: (Math.random() * 60 + 40).toFixed(1),
+      status,
+      statusLabel: status === 'active' ? 'Active' : status === 'idle' ? 'Idle' : 'Warning'
+    })
+  }
+  return tiles
+}
+
+const selectChannel = channel => {
+  selectedChannel.value = channel
+}
+
+// Historical chart
+const historicalStats = reactive({
+  maxTemp: 33.4,
+  minVdd: 1.18,
+  maxCurrent: 662,
+  warnings: 2
+})
+
+const historicalSeries = reactive({
+  labels: ['-24h', '-18h', '-12h', '-6h', 'Now'],
+  temperature: [29.1, 30.4, 31.2, 32.5, 31.8],
+  vdd: [1.20, 1.19, 1.18, 1.19, 1.20],
+  current: [620, 640, 655, 660, 645]
+})
+
+let historicalChart = null
+
+const buildHistoricalChart = () => {
+  if (!historicalChartRef.value) return
+  if (historicalChart) {
+    historicalChart.destroy()
+  }
+
+  historicalChart = new Chart(historicalChartRef.value, {
+    type: 'line',
+    data: {
+      labels: historicalSeries.labels,
+      datasets: [
+        {
+          label: 'Temperature (degC)',
+          data: historicalSeries.temperature,
+          borderColor: '#F97316',
+          backgroundColor: 'rgba(249, 115, 22, 0.15)',
+          tension: 0.3,
+          fill: false
+        },
+        {
+          label: 'VDD (V)',
+          data: historicalSeries.vdd,
+          borderColor: '#0EA5E9',
+          backgroundColor: 'rgba(14, 165, 233, 0.15)',
+          tension: 0.3,
+          fill: false,
+          yAxisID: 'y1'
+        },
+        {
+          label: 'Total current (mA)',
+          data: historicalSeries.current,
+          borderColor: '#22C55E',
+          backgroundColor: 'rgba(34, 197, 94, 0.15)',
+          tension: 0.3,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top'
+        }
+      },
+      scales: {
+        y: {
+          title: { display: true, text: 'Temperature / Current' },
+          beginAtZero: false
+        },
+        y1: {
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'VDD (V)' },
+          suggestedMin: 1.15,
+          suggestedMax: 1.25
+        }
+      }
+    }
+  })
+}
+
+const destroyHistoricalChart = () => {
+  if (historicalChart) {
+    historicalChart.destroy()
+    historicalChart = null
+  }
+}
+
+// Filter/show logic
+const miniNavItems = [
+  { key: 'summary', label: 'Overview' },
+  { key: 'live', label: 'Live' },
+  { key: 'channels', label: 'Channels' },
+  { key: 'alerts', label: 'Alerts' }
+]
+const activeMiniNav = ref('summary')
+
+const sectionRefs = {
+  summary: summarySection,
+  live: liveSection,
+  channels: channelsSection,
+  alerts: alertsSection
+}
+
+let intervalId = null
+let scrollSpyAttached = false
+
 const onSerenityChange = () => {
   if (serenity.value === 'S1.2') {
     ccDisabled.value = false
@@ -341,45 +517,68 @@ const reset = () => {
   cc.value = ''
   ccDisabled.value = true
   hasDisplayed.value = false
+  showFilter.value = true
+  activeTab.value = 'overview'
+  selectedChannel.value = null
+  showReconstructionGraphs.value = true
+  destroyHistoricalChart()
+  detachScrollSpy()
+  if (intervalId) clearInterval(intervalId)
+}
+
+const backToFilter = () => {
+  showFilter.value = true
+  hasDisplayed.value = false
+  activeTab.value = 'overview'
+  selectedChannel.value = null
+  showReconstructionGraphs.value = true
+  destroyHistoricalChart()
+  detachScrollSpy()
+  nextTick(() => {
+    filterCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 const display = () => {
   if (serenity.value === 'S1.2' && (cc.value === 'CC2' || cc.value === 'CC3')) {
+    showFilter.value = false
     hasDisplayed.value = true
-    console.log('Selected:', serenity.value, cc.value)
+    activeTab.value = 'overview'
+    showReconstructionGraphs.value = true
     startLiveUpdates()
+    scrollToResults()
   }
 }
 
-// Live data updates
+const scrollToResults = () => {
+  nextTick(() => {
+    summarySection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
 const startLiveUpdates = () => {
   if (intervalId) clearInterval(intervalId)
-  
+
   intervalId = setInterval(() => {
-    // Update temperatures (±0.3°C)
     temps.tofhir = parseFloat((temps.tofhir + (Math.random() - 0.5) * 0.6).toFixed(1))
     temps.lpgbt = parseFloat((temps.lpgbt + (Math.random() - 0.5) * 0.6).toFixed(1))
     temps.board = parseFloat((temps.board + (Math.random() - 0.5) * 0.6).toFixed(1))
 
-    // Update voltages (±0.02V)
     voltages.vdd = parseFloat((voltages.vdd + (Math.random() - 0.5) * 0.04).toFixed(2))
     voltages.vddl = parseFloat((voltages.vddl + (Math.random() - 0.5) * 0.04).toFixed(2))
     voltages.vbias = parseFloat((voltages.vbias + (Math.random() - 0.5) * 0.04).toFixed(1))
     voltages.v1v8 = parseFloat((voltages.v1v8 + (Math.random() - 0.5) * 0.04).toFixed(2))
 
-    // Update currents (±10mA)
     currents.avdd = Math.round(currents.avdd + (Math.random() - 0.5) * 20)
     currents.dvdd = Math.round(currents.dvdd + (Math.random() - 0.5) * 20)
     currents.total = Math.round(currents.total + (Math.random() - 0.5) * 30)
 
-    // Update timestamp
     lastUpdate.value = new Date().toISOString()
   }, 2000)
 }
 
-// Actions footer functions
-const toggleGraphs = () => {
-  graphsCollapsed.value = !graphsCollapsed.value
+const toggleReconstruction = () => {
+  showReconstructionGraphs.value = !showReconstructionGraphs.value
 }
 
 const exportSummary = () => {
@@ -390,40 +589,104 @@ const downloadCSV = () => {
   console.log('Download CSV...')
 }
 
+const setActiveTab = tab => {
+  activeTab.value = tab
+}
+
+const scrollToSection = key => {
+  const refEl = sectionRefs[key]?.value
+  if (refEl) {
+    activeMiniNav.value = key
+    refEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+const handleScroll = () => {
+  if (activeTab.value !== 'overview') return
+  const offset = 160
+  const position = window.scrollY + offset
+  const sections = [
+    { key: 'summary', ref: summarySection },
+    { key: 'live', ref: liveSection },
+    { key: 'channels', ref: channelsSection },
+    { key: 'alerts', ref: alertsSection }
+  ]
+
+  for (let i = sections.length - 1; i >= 0; i--) {
+    const current = sections[i]
+    if (current.ref.value) {
+      const top = current.ref.value.getBoundingClientRect().top + window.scrollY
+      if (position >= top) {
+        activeMiniNav.value = current.key
+        return
+      }
+    }
+  }
+  activeMiniNav.value = 'summary'
+}
+
+const attachScrollSpy = () => {
+  if (scrollSpyAttached) return
+  window.addEventListener('scroll', handleScroll)
+  scrollSpyAttached = true
+}
+
+const detachScrollSpy = () => {
+  if (!scrollSpyAttached) return
+  window.removeEventListener('scroll', handleScroll)
+  scrollSpyAttached = false
+}
+
+watch(
+  () => ({ displayed: hasDisplayed.value, tab: activeTab.value }),
+  ({ displayed, tab }) => {
+    if (displayed && tab === 'overview') {
+      nextTick(() => {
+        buildHistoricalChart()
+        handleScroll()
+      })
+      attachScrollSpy()
+    } else {
+      detachScrollSpy()
+      destroyHistoricalChart()
+    }
+  }
+)
+
 onMounted(() => {
-  // Cleanup handled in onUnmounted
+  // nothing additional
 })
 
 onUnmounted(() => {
   if (intervalId) clearInterval(intervalId)
+  detachScrollSpy()
+  destroyHistoricalChart()
 })
 </script>
 
 <style scoped>
-/* General */
 .collector-page {
-  padding: 0;
   min-height: 100vh;
-  background-color: #F4F6F9;
+  background-color: #f4f6f9;
+  padding-bottom: 48px;
 }
 
-/* Filter Card */
 .collector-card {
   width: 900px;
-  background-color: #FFFFFF;
+  background-color: #fff;
   border-radius: 8px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
   margin: 40px auto 0;
+  overflow: hidden;
 }
 
 .card-header {
   height: 56px;
-  background-color: #CDEFFC;
+  background-color: #cdeffc;
   padding: 0 24px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #B8DCF5;
+  border-bottom: 1px solid #b8dcf5;
 }
 
 .header-title {
@@ -432,13 +695,12 @@ onUnmounted(() => {
   gap: 8px;
   font-size: 18px;
   font-weight: 600;
-  color: #1A1A1A;
+  color: #1a1a1a;
 }
 
 .info-icon {
   font-size: 16px;
-  color: #2582A4;
-  cursor: help;
+  color: #2582a4;
 }
 
 .card-body {
@@ -447,10 +709,6 @@ onUnmounted(() => {
 
 .form-group {
   margin-bottom: 22px;
-}
-
-.form-group:last-of-type {
-  margin-bottom: 0;
 }
 
 .field-label {
@@ -463,48 +721,40 @@ onUnmounted(() => {
 
 .dropdown-wrapper {
   position: relative;
-  display: flex;
-  align-items: center;
 }
 
 .dropdown {
   width: 100%;
   height: 42px;
-  border: 1px solid #C8CCD1;
+  border: 1px solid #c8ccd1;
   border-radius: 4px;
-  background-color: white;
-  font-size: 14px;
   padding: 0 12px;
   padding-right: 32px;
-  color: #2B2B2B;
+  font-size: 14px;
   appearance: none;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.dropdown:hover:not(:disabled) {
-  background-color: #F8FAFB;
+  background: #fff;
 }
 
 .dropdown:disabled {
-  color: #A0A0A0;
+  background-color: #f8fafb;
+  color: #a0a0a0;
   cursor: not-allowed;
-  background-color: #F8FAFB;
 }
 
 .dropdown-arrow {
   position: absolute;
   right: 12px;
-  color: #4A4A4A;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 12px;
-  pointer-events: none;
+  color: #4a4a4a;
 }
 
 .button-group {
   display: flex;
   justify-content: flex-end;
-  margin-top: 32px;
   gap: 12px;
+  margin-top: 32px;
 }
 
 .btn {
@@ -514,305 +764,341 @@ onUnmounted(() => {
   font-weight: 500;
   padding: 0 18px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  border: none;
 }
 
 .btn-reset {
-  border: 1px solid #C5C5C5;
-  background-color: #FFFFFF;
-  color: #2B2B2B;
-}
-
-.btn-reset:hover {
-  background-color: #F3F4F6;
+  border: 1px solid #c5c5c5;
+  background-color: #fff;
 }
 
 .btn-display {
-  background-color: #0A9EBB;
-  color: white;
-  padding: 0 20px;
-}
-
-.btn-display:hover {
-  background-color: #0C8CA6;
-}
-
-/* Main Content */
-.main-content {
-  padding: 24px;
-  min-height: 100vh;
-}
-
-.back-button-wrapper {
-  margin-bottom: 24px;
-}
-
-.btn-back {
-  background-color: transparent;
-  color: #0A9EBB;
   border: none;
-  font-size: 14px;
+  background-color: #0a9ebb;
+  color: #fff;
+}
+
+.results-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 32px auto 0;
+  padding: 0 24px 32px;
+  box-sizing: border-box;
+}
+
+.back-link {
+  background: none;
+  border: none;
+  color: #0a9ebb;
   font-weight: 500;
+  margin-bottom: 16px;
   cursor: pointer;
-  padding: 0;
-  transition: color 0.15s ease;
 }
 
-.btn-back:hover {
-  color: #0C8CA6;
+.collector-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
 }
 
-/* Summary Banner */
+.tab-item {
+  background: none;
+  border: none;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-item.active {
+  color: #0a9ebb;
+  border-color: #0a9ebb;
+  font-weight: 600;
+}
+
+.mini-nav {
+  position: sticky;
+  top: 64px;
+  display: flex;
+  gap: 12px;
+  background: #f4f6f9;
+  padding: 8px 0 16px;
+  z-index: 1;
+}
+
+.mini-nav-item {
+  background: none;
+  border: none;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.mini-nav-item.active {
+  color: #0a9ebb;
+  font-weight: 600;
+}
+
 .summary-card {
-  background-color: #FFFFFF;
+  background-color: #fff;
   border-radius: 8px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
   padding: 18px 24px;
   display: flex;
-  justify-content: space-between;
   gap: 40px;
   margin-bottom: 24px;
 }
 
-.summary-left {
-  flex: 1;
-}
-
+.summary-left,
 .summary-right {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-start;
 }
 
 .meta-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 12px;
-  align-items: center;
+  margin-bottom: 10px;
 }
 
 .meta-label {
   font-size: 12px;
-  color: #7A7A7A;
-  margin-right: 16px;
+  color: #6b7280;
 }
 
 .meta-value {
   font-size: 15px;
-  color: #1F1F1F;
   font-weight: 600;
+  color: #111827;
 }
 
 .health-pill {
-  background-color: #E3F7E9;
-  color: #1E7A3C;
+  background: #e3f7e9;
+  color: #166534;
   padding: 4px 12px;
   border-radius: 999px;
-  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 16px;
   display: inline-block;
+  margin-bottom: 12px;
 }
 
 .metrics-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 100%;
-}
-
-.metric-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
 }
 
 .metric-label {
-  color: #7A7A7A;
+  color: #6b7280;
   margin-right: 12px;
 }
 
 .metric-value {
-  color: #1F1F1F;
   font-weight: 600;
 }
 
 .metric-green {
-  color: #22C55E;
+  color: #22c55e;
 }
 
 .dot-green {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
   margin-right: 4px;
-}
-
-/* Live Monitoring Section */
-.live-section {
-  margin-top: 0;
 }
 
 .section-title {
   font-size: 18px;
   font-weight: 600;
-  color: #2B2B2B;
-  margin: 0 0 12px 0;
+  margin-bottom: 12px;
+  color: #2b2b2b;
 }
 
 .monitoring-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
 }
 
 .monitor-card {
-  background-color: #FFFFFF;
+  background: #fff;
   border-radius: 8px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.04);
   padding: 16px 18px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
 }
 
 .card-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
-}
-
-.card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #2B2B2B;
-  margin: 0;
+  margin-bottom: 12px;
 }
 
 .live-indicator {
+  font-size: 11px;
+  font-weight: 600;
+  color: #22c55e;
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  color: #22C55E;
-  font-weight: 600;
 }
 
 .live-dot {
   width: 6px;
   height: 6px;
-  background-color: #22C55E;
   border-radius: 50%;
-  display: inline-block;
+  background: #22c55e;
   animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.live-text {
-  letter-spacing: 0.5px;
 }
 
 .card-content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .data-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   font-size: 13px;
 }
 
 .data-label {
   display: flex;
   align-items: center;
-  color: #4A4A4A;
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-right: 6px;
-  display: inline-block;
+  color: #4a4a4a;
+  gap: 6px;
 }
 
 .dot.green {
-  background-color: #22C55E;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
 }
 
-.data-value {
-  font-weight: 600;
-  color: #1F1F1F;
+.section-divider {
+  border-top: 1px solid #e5e7eb;
+  margin: 28px 0;
 }
 
-/* TOFHIR Reconstruction Section */
-.reconstruction-section {
-  margin-top: 32px;
-}
-
-.reconstruction-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2B2B2B;
-  margin: 0 0 16px 0;
-}
-
-.reconstruction-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.recon-card {
-  background-color: #FFFFFF;
+.historical-card {
+  background: #fff;
   border-radius: 8px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+  padding: 18px 20px;
 }
 
-.recon-card-header {
-  height: 42px;
-  background-color: #CDEFFC;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  font-size: 14px;
+.stat-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-block {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0 0 4px;
+}
+
+.stat-value {
+  font-size: 16px;
   font-weight: 600;
-  color: #1A1A1A;
+  margin: 0;
 }
 
-.recon-card-body {
-  padding: 16px;
-  background-color: #FFFFFF;
+.historical-chart {
+  height: 260px;
 }
 
-/* Alerts Section */
-.alerts-section {
-  margin-top: 24px;
+.channels-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.selected-channel {
+  font-size: 13px;
+  color: #0a9ebb;
+  font-weight: 500;
+}
+
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.channel-tile {
+  background: #f9fafb;
+  border: 1px solid #e3e5ea;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.channel-tile:hover {
+  background: #f1f3f7;
+  box-shadow: inset 0 0 0 1px #d1d5db;
+}
+
+.channel-selected {
+  border-color: #0a9ebb;
+  box-shadow: 0 0 0 1px #0a9ebb inset;
+}
+
+.channel-id {
+  font-weight: 600;
+  margin: 0;
+}
+
+.channel-meta {
+  margin: 2px 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.status-pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-active {
+  background: #e3f7e9;
+  color: #166534;
+}
+
+.status-idle {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.status-warning {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .alerts-card {
-  background-color: #FFFFFF;
+  background: #fff;
   border-radius: 8px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.06);
-  padding: 16px 18px;
-}
-
-.alerts-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2B2B2B;
-  margin: 0 0 16px 0;
+  padding: 18px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
 }
 
 .alerts-list {
@@ -821,111 +1107,157 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.alert-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 4px;
-}
-
-.alert-item.alert-info {
-  background-color: #E6F3FF;
-}
-
-.alert-item.alert-warning {
-  background-color: #FFF9E6;
-}
-
-.alert-item.alert-success {
-  background-color: #E6F7ED;
-}
-
-.alert-icon {
-  font-size: 12px;
-  margin-top: 2px;
-}
-
-.alert-icon-info {
-  color: #2582A4;
-}
-
-.alert-icon-warning {
-  color: #F59E0B;
-}
-
-.alert-icon-success {
-  color: #22C55E;
-}
-
-.alert-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.alert-header {
-  display: flex;
-  justify-content: space-between;
+.alert-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 80px;
   align-items: center;
+  padding: 10px 12px;
+  border-radius: 6px;
 }
 
-.alert-severity {
-  font-size: 12px;
+.alert-info {
+  background: #e6f3ff;
+}
+
+.alert-warning {
+  background: #fff9e6;
+}
+
+.alert-success {
+  background: #e6f7ed;
+}
+
+.alert-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
-  color: #4A4A4A;
 }
 
-.alert-time {
-  font-size: 11px;
-  color: #7A7A7A;
+.alert-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.alert-dot-info {
+  background: #0ea5e9;
+}
+
+.alert-dot-warning {
+  background: #f97316;
+}
+
+.alert-dot-success {
+  background: #22c55e;
 }
 
 .alert-message {
   font-size: 13px;
-  color: #2B2B2B;
+  color: #1f2937;
 }
 
-/* Actions Footer */
-.actions-footer {
+.alert-time {
+  font-size: 12px;
+  text-align: right;
+  color: #6b7280;
+}
+
+.actions-bar {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 28px;
+  padding-top: 16px;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 32px;
-  padding-bottom: 24px;
 }
 
 .btn-action {
-  height: 32px;
   border-radius: 4px;
   font-size: 14px;
-  font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
-  border: none;
-}
-
-.btn-export,
-.btn-download {
-  background-color: #FFFFFF;
-  border: 1px solid #C5C5C5;
-  color: #2B2B2B;
   padding: 6px 14px;
 }
 
-.btn-export:hover,
-.btn-download:hover {
-  background-color: #F8FAFB;
+.btn-outline {
+  background: #fff;
+  border: 1px solid #d1d5db;
 }
 
-.btn-collapse {
-  background-color: #0A9EBB;
-  color: white;
-  padding: 6px 16px;
+.btn-solid {
+  background: #0a9ebb;
+  border: none;
+  color: #fff;
 }
 
-.btn-collapse:hover {
-  background-color: #0C8CA6;
+.reconstruction-panel {
+  margin-top: 24px;
+}
+
+.recon-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+  margin-bottom: 20px;
+}
+
+.recon-meta {
+  margin: 0;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.recon-value {
+  font-weight: 600;
+  color: #111827;
+}
+
+.reconstruction-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.recon-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.recon-card-header {
+  background: #cdeffc;
+  padding: 10px 18px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.recon-card-body {
+  padding: 16px 18px;
+}
+
+.recon-empty {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  color: #6b7280;
+  border: 1px dashed #d1d5db;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 </style>
