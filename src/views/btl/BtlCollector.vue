@@ -5,7 +5,6 @@
       <div class="card-header">
         <div class="header-title">
           <span>MTD BTL Collector</span>
-          <span class="info-icon">i</span>
         </div>
       </div>
 
@@ -162,10 +161,24 @@
         </section>
 
         <section ref="channelsSection" id="channels-section" class="channels-section">
-          <div class="section-header">
-            <h3 class="section-title">Channel Overview (mock)</h3>
+          <div class="section-header channel-section-header">
+            <div>
+              <h3 class="section-title">Channel Overview </h3>
+            </div>
             <div v-if="selectedChannelInfo" class="selected-channel">
               Selected channel: CH {{ selectedChannelInfo.id }} (eLink {{ selectedChannelInfo.elink }})
+            </div>
+          </div>
+          <div class="channel-toolbar">
+            <div class="channel-summary">
+              <span class="summary-chip summary-active">Active: <strong>{{ channelSummary.active }}</strong></span>
+              <span class="summary-chip summary-idle">Idle: <strong>{{ channelSummary.idle }}</strong></span>
+              <span class="summary-chip summary-warning">Warning: <strong>{{ channelSummary.warning }}</strong></span>
+            </div>
+            <div class="channel-legend">
+              <span class="legend-item"><span class="legend-dot legend-active"></span>Active</span>
+              <span class="legend-item"><span class="legend-dot legend-idle"></span>Idle</span>
+              <span class="legend-item"><span class="legend-dot legend-warning"></span>Warning</span>
             </div>
           </div>
           <div class="channel-grid">
@@ -175,10 +188,17 @@
               :class="['channel-tile', { 'channel-tile--selected': selectedChannel === channel.id }]"
               @click="focusChannelFromGrid(channel.id, channel.elink)"
             >
-              <p class="channel-id">CH {{ channel.id }}</p>
-              <p class="channel-meta">eLink {{ channel.elink }}</p>
-              <p class="channel-meta">Hit rate: {{ channel.hitRate }} kHz</p>
-              <span class="status-pill" :class="`status-${channel.status}`">{{ channel.statusLabel }}</span>
+              <div class="channel-top">
+                <span class="channel-id">CH {{ channel.id }}</span>
+                <span class="status-pill" :class="`status-${channel.status}`">{{ channel.statusLabel }}</span>
+              </div>
+              <div class="channel-meta-row">
+                <span class="channel-elink">eLink {{ channel.elink }}</span>
+                <span class="channel-hit">{{ channel.hitRate.toFixed(1) }} kHz</span>
+              </div>
+              <div class="channel-bar">
+                <span class="channel-bar-fill" :style="{ width: channel.hitPercent + '%' }"></span>
+              </div>
             </div>
           </div>
         </section>
@@ -295,7 +315,7 @@ const summaryMeta = computed(() => [
   { label: 'Serenity Board', value: serenity.value },
   { label: 'CC', value: cc.value },
   { label: 'eLinks active', value: '4 / 4' },
-  { label: 'Channels', value: '48 channels' },
+  { label: 'Channels', value: '30 channels' },
   { label: 'Firmware version', value: 'v1.3.2-mock' }
 ])
 
@@ -391,23 +411,38 @@ const showOnlySelected = ref(false)
 
 function generateChannels() {
   const tiles = []
-  for (let i = 1; i <= 48; i++) {
+  for (let i = 1; i <= 30; i++) {
     const elink = Math.floor((i - 1) / 12)
     const roll = Math.random()
     let status = 'active'
     if (roll > 0.85) status = 'warning'
     else if (roll > 0.65) status = 'idle'
 
+    const hitRate = Number((Math.random() * 60 + 40).toFixed(1))
+    const hitPercent = Math.min(100, Math.max(15, Math.round((hitRate / 120) * 100)))
+
     tiles.push({
       id: i,
       elink,
-      hitRate: (Math.random() * 60 + 40).toFixed(1),
+      hitRate,
+      hitPercent,
       status,
       statusLabel: status === 'active' ? 'Active' : status === 'idle' ? 'Idle' : 'Warning'
     })
   }
   return tiles
 }
+
+// just totalling each status for the little chips
+const channelSummary = computed(() => {
+  return channelTiles.value.reduce(
+    (acc, channel) => {
+      acc[channel.status] = (acc[channel.status] || 0) + 1
+      return acc
+    },
+    { active: 0, idle: 0, warning: 0 }
+  )
+})
 
 const selectedChannelInfo = computed(() => {
   if (selectedChannel.value === null) return null
@@ -425,6 +460,7 @@ const focusedChannelDisplay = computed(() => {
 })
 
 const hasReconForSelection = computed(() => {
+  // no point toggling if the channel doesn't have a recon card
   if (selectedChannel.value === null) return false
   return reconChannels.some(channel => channel.id === selectedChannel.value)
 })
@@ -437,6 +473,7 @@ const visibleReconChannels = computed(() => {
 })
 
 const focusChannelFromGrid = (channelId, elink) => {
+  // tap a tile -> focus the recon tab and scroll to that card
   selectedChannel.value = channelId
   selectedChannelFallbackElink.value = elink
   activeTab.value = 'reconstruction'
@@ -453,6 +490,7 @@ const focusChannelFromGrid = (channelId, elink) => {
 
 watch(selectedChannel, value => {
   if (value === null) {
+    // reset toggle + fallback when nothing is focused
     showOnlySelected.value = false
     selectedChannelFallbackElink.value = null
   }
@@ -614,6 +652,7 @@ const display = () => {
     hasDisplayed.value = true
     activeTab.value = 'overview'
     showReconstructionGraphs.value = true
+    // user gets the full overview first, then can hop to recon
     startLiveUpdates()
     scrollToResults()
   }
@@ -761,15 +800,9 @@ onUnmounted(() => {
 .header-title {
   display: flex;
   align-items: center;
-  gap: 8px;
   font-size: 18px;
   font-weight: 600;
   color: #1a1a1a;
-}
-
-.info-icon {
-  font-size: 16px;
-  color: #2582a4;
 }
 
 .card-body {
@@ -786,6 +819,7 @@ onUnmounted(() => {
   font-weight: 500;
   color: #222;
   margin-bottom: 6px;
+  text-align: left;
 }
 
 .dropdown-wrapper {
@@ -1104,49 +1138,163 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
+.section-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.channel-section-header {
+  align-items: flex-start;
+}
+
+.channel-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.channel-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summary-chip {
+  font-size: 12px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 4px 10px;
+  color: #4b5563;
+}
+
+.summary-chip strong {
+  margin-left: 4px;
+  color: #111827;
+}
+
+.summary-active {
+  background: #e0f7eb;
+  color: #166534;
+}
+
+.summary-idle {
+  background: #edeff3;
+  color: #374151;
+}
+
+.summary-warning {
+  background: #fff3d6;
+  color: #92400e;
+}
+
+.channel-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-active {
+  background: #16a34a;
+}
+
+.legend-idle {
+  background: #9ca3af;
+}
+
+.legend-warning {
+  background: #f59e0b;
+}
+
 .channel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
 }
 
 .channel-tile {
-  background: #f9fafb;
+  background: #fff;
   border: 1px solid #e3e5ea;
-  border-radius: 6px;
-  padding: 8px;
+  border-radius: 10px;
+  padding: 12px;
   cursor: pointer;
-  transition: background 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
 .channel-tile:hover {
-  background: #f1f3f7;
-  box-shadow: inset 0 0 0 1px #d1d5db;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.08);
 }
 
 .channel-tile--selected {
   border-color: #0a9ebb;
   background: #ecfeff;
-  box-shadow: 0 0 0 1px #0a9ebb inset;
+  box-shadow: 0 6px 14px rgba(6, 182, 212, 0.2);
+}
+
+.channel-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .channel-id {
   font-weight: 600;
-  margin: 0;
+  font-size: 15px;
+  color: #111827;
 }
 
-.channel-meta {
-  margin: 2px 0;
+.channel-meta-row {
+  display: flex;
+  justify-content: space-between;
   font-size: 12px;
-  color: #6b7280;
+  color: #4b5563;
+  margin-bottom: 10px;
+}
+
+.channel-bar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.channel-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0ea5e9, #0a9ebb);
 }
 
 .status-pill {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 10px;
   font-size: 11px;
   font-weight: 600;
+  text-transform: uppercase;
 }
 
 .status-active {
